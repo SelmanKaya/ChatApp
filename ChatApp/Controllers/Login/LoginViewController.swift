@@ -7,6 +7,7 @@
 
 import UIKit
 import FirebaseAuth
+import GoogleSignIn
 
 class LoginViewController: UIViewController {
     
@@ -68,11 +69,22 @@ class LoginViewController: UIViewController {
         return button
     }()
         
+    private let googleLogInButton : GIDSignInButton = GIDSignInButton()
     
-    
-
+    private var loginObserver: NSObjectProtocol?
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        loginObserver = NotificationCenter.default.addObserver(forName: .didLogInNotification,object: nil,queue: .main,using: { [weak self] _ in
+            guard let strongSelf = self else { return }
+                            
+            strongSelf.navigationController?.dismiss(animated: true)
+        })
+        
+        //GIDSignIn.sharedInstance()?.presentingViewController = self
+        googleLogInButton.addTarget(self, action: #selector(googleSignInButtonTapped), for: .touchUpInside)
+
+        
         title = "Login"
         view.backgroundColor = .white
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Register",
@@ -93,10 +105,60 @@ class LoginViewController: UIViewController {
         scrollView.addSubview(imageView)
         scrollView.addSubview(passwordField)
         scrollView.addSubview(loginButton)
+        scrollView.addSubview(googleLogInButton)
 
 
         
     }
+    deinit{
+        if let observer = loginObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+    @objc private func googleSignInButtonTapped() {
+            // GIDSignIn'ın sign-in işlemini başlat
+            GIDSignIn.sharedInstance.signIn(withPresenting: self) { [weak self] signInResult, error in
+                guard let result = signInResult else {
+                    print("Google Sign-In failed: \(error?.localizedDescription ?? "Unknown error")")
+                    return
+                }
+                
+                print("Did sign in with google: \(result.user)")
+                
+                guard let email = result.user.profile?.email,
+                      let firstName = result.user.profile?.givenName,
+                      let lastName = result.user.profile?.familyName
+                    else{return}
+                
+                DatabaseManager.shared.userExists(with: email, completion: { exists in
+                    if !exists {
+                        DatabaseManager.shared.insertUser(with: ChatAppUser(firstName: firstName,
+                                                                            lastName: lastName,
+                                                                            emailAddress: email))
+                    }
+                    
+                })
+                // Kullanıcıyı al
+                let user = result.user
+                print("User signed in: \(user.profile?.email ?? "No Email")")
+
+                // Firebase Authentication işlemi
+                guard let idToken = user.idToken?.tokenString else {
+                    print("Missing auth object off of google user")
+                    return }
+                let accessToken = user.accessToken.tokenString
+                let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
+
+                Auth.auth().signIn(with: credential) { authResult, error in
+                    if let error = error {
+                        print("Firebase authentication failed: \(error.localizedDescription)")
+                    } else {
+                        print("Firebase sign-in successful for: \(authResult?.user.email ?? "")")
+                        NotificationCenter.default.post(name: .didLogInNotification, object: nil)
+                    }
+                }
+            }
+        }
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         
@@ -128,6 +190,11 @@ class LoginViewController: UIViewController {
                                    y: passwordField.frame.maxY + 10,
                                    width: scrollView.width - 60,
                                    height: 52)
+        
+        googleLogInButton.frame = CGRect(x: 30,
+                                         y: loginButton.bottom+10,
+                                         width: scrollView.width-60,
+                                         height: 52)
     }
 
     
