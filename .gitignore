@@ -1,2 +1,14 @@
 *.xcuserstate
 
+# Xcode tarafından oluşturulan dosyalar
+DerivedData/
+.idea/
+
+
+# GoogleService-Info.plist dosyasını yoksay
+GoogleService-Info.plist
+Info.plist
+
+# Diğer dosyalar
+*.log
+*.swp
