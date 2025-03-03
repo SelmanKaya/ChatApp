@@ -1,0 +1,12 @@
+
+
+# Swift / Xcode projeleri için
+DerivedData/
+Pods/
+xcuserdata/
+*.xcworkspace
+*.xcodeproj
+
+# Firebase ve Xcode plist dosyaları
+GoogleService-Info.plist
+Info.plist
